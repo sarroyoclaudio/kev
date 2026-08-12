@@ -1,0 +1,56 @@
+name: Update KEV feed
+
+# Refreshes the same-origin copy of CISA's KEV catalog once a day so the
+# dashboard loads its data from your own repo instead of relying on a
+# cross-origin fetch or public proxies.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # daily at ~06:17 UTC
+  workflow_dispatch:        # lets you run it on demand from the Actions tab
+
+permissions:
+  contents: write           # needed to commit the updated file
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download and validate the KEV feed
+        run: |
+          set -euo pipefail
+          # Change this path if your index.html lives somewhere other than kev/
+          OUT="kev/known_exploited_vulnerabilities.json"
+          mkdir -p "$(dirname "$OUT")"
+
+          curl -fsSL --retry 3 --retry-delay 5 \
+            -o "$OUT.tmp" \
+            https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+          # Sanity check: valid JSON with a real catalog, not an error page.
+          python3 - "$OUT.tmp" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          vulns = d.get("vulnerabilities")
+          assert isinstance(vulns, list) and len(vulns) > 100, "feed failed sanity check"
+          print(f"OK: {len(vulns)} vulnerabilities, catalog {d.get('catalogVersion')}")
+          PY
+
+          mv "$OUT.tmp" "$OUT"
+
+      - name: Commit if the feed changed
+        run: |
+          set -euo pipefail
+          OUT="kev/known_exploited_vulnerabilities.json"
+          git config user.name "kev-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$OUT"
+          if git diff --cached --quiet; then
+            echo "No changes today."
+          else
+            git commit -m "Update KEV feed ($(date -u +%Y-%m-%d))"
+            git push
+          fi
