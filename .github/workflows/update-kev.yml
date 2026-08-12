@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           # Change this path if your index.html lives somewhere other than kev/
-          OUT="kev/known_exploited_vulnerabilities.json"
+          OUT="known_exploited_vulnerabilities.json"
           mkdir -p "$(dirname "$OUT")"
 
           curl -fsSL --retry 3 --retry-delay 5 \
@@ -44,7 +44,7 @@ jobs:
       - name: Commit if the feed changed
         run: |
           set -euo pipefail
-          OUT="kev/known_exploited_vulnerabilities.json"
+          OUT="known_exploited_vulnerabilities.json"
           git config user.name "kev-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$OUT"
